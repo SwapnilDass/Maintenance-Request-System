@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  TECHNICIAN
+  MANAGER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hash, never the raw password
+  name      String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+}
+
+// Define remaining models here (Request, Category, ...)
