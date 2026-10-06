@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../middleware/requireAuth";
 
 const router = Router();
 
@@ -43,6 +44,15 @@ router.post("/login", async (req, res) => {
     token,
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
+});
+
+// who am I? the frontend calls this on page load to check the saved token is still good
+router.get("/me", requireAuth, async (_req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: res.locals.userId } });
+  if (!user) {
+    return res.status(401).json({ error: "User no longer exists" });
+  }
+  res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
 export default router;

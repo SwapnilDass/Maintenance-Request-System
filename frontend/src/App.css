@@ -213,3 +213,11 @@
   margin: 0 0 16px;
   color: var(--text);
 }
+
+/* ---- story #1: placeholder pages for the other roles ---- */
+
+.feature-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--text-muted);
+}
