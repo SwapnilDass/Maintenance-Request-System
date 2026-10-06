@@ -10,7 +10,8 @@ interface Category {
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
-export function SubmitRequestPage() {
+// onSubmitted lets App tell the "My requests" list to reload (story #3)
+export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,6 +51,7 @@ export function SubmitRequestPage() {
       setLocation("");
       setCategoryId("");
       setPriority("MEDIUM");
+      onSubmitted?.();
     } catch (err) {
       // show the backend's message if it sent one (ex. "Title is required")
       if (axios.isAxiosError(err) && err.response?.data?.error) {
