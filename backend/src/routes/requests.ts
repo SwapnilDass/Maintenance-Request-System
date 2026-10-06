@@ -46,4 +46,16 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json(request);
 });
 
+// story #3 - the logged in user's own requests, newest first, so they can check the status.
+// userId comes from the token, so there's no way to ask for someone else's requests
+router.get("/mine", requireAuth, async (_req, res) => {
+  const requests = await prisma.request.findMany({
+    where: { userId: res.locals.userId },
+    orderBy: { createdAt: "desc" },
+    include: { category: true },
+  });
+
+  res.json(requests);
+});
+
 export default router;

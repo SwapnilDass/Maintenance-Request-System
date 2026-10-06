@@ -1,4 +1,4 @@
-// tests for story #2 (submit a maintenance request), run with "npm test"
+// tests for story #2 (submit a maintenance request) and story #3 (view my requests), run with "npm test"
 // uses node's built in test runner so we didn't need to install jest or anything
 //
 // the validation and auth tests work without a database.
@@ -173,5 +173,80 @@ describe("API routes", () => {
 
     // clean up so the test doesn't leave junk in the db
     await prisma.request.delete({ where: { id: created.id } });
+  });
+
+  // ---- story #3 (view my requests and status) ----
+
+  function getMine(token?: string) {
+    return fetch(`${baseUrl}/requests/mine`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  }
+
+  test("GET /requests/mine without a token returns 401", async () => {
+    const res = await getMine();
+    assert.equal(res.status, 401);
+  });
+
+  test("GET /requests/mine with a fake token returns 401", async () => {
+    const res = await getMine("not-a-real-token");
+    assert.equal(res.status, 401);
+  });
+
+  test("GET /requests/mine for a user with no requests returns an empty list (needs db)", async (t) => {
+    if (!dbReady) return t.skip("database not running");
+
+    const res = await getMine(tokenFor("user-with-no-requests"));
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), []);
+  });
+
+  test("GET /requests/mine returns only my requests, newest first, with status and category (needs db)", async (t) => {
+    if (!dbReady) return t.skip("database not running");
+
+    const me = await prisma.user.findUnique({ where: { email: "customer@demo.com" } });
+    const category = await prisma.category.findFirst();
+    assert.ok(me && category, "run npm run prisma:seed first");
+
+    // a second user, so we can check their request doesn't show up in my list
+    const someoneElse = await prisma.user.create({
+      data: { email: `other-${Date.now()}@test.com`, password: "x", name: "Other Person" },
+    });
+
+    const base = { description: "test", location: "test", categoryId: category.id };
+    const older = await prisma.request.create({
+      data: { ...base, title: "Older one", userId: me.id, createdAt: new Date("2026-01-01") },
+    });
+    const newer = await prisma.request.create({
+      data: { ...base, title: "Newer one", userId: me.id, status: "In Progress" },
+    });
+    const notMine = await prisma.request.create({
+      data: { ...base, title: "Not mine", userId: someoneElse.id },
+    });
+
+    try {
+      const res = await getMine(tokenFor(me.id));
+      assert.equal(res.status, 200);
+      const list: { id: string; title: string; status: string; userId: string; category: { name: string } }[] =
+        await res.json();
+
+      const ids = list.map((r) => r.id);
+      assert.ok(!ids.includes(notMine.id), "should not see another user's request");
+      assert.ok(list.every((r) => r.userId === me.id), "every request should be mine");
+
+      // newest first
+      assert.ok(ids.indexOf(newer.id) < ids.indexOf(older.id), "newest request should come first");
+
+      const newerFromApi = list.find((r) => r.id === newer.id)!;
+      assert.equal(newerFromApi.status, "In Progress");
+      assert.equal(newerFromApi.category.name, category.name);
+
+      const olderFromApi = list.find((r) => r.id === older.id)!;
+      assert.equal(olderFromApi.status, "Submitted");
+    } finally {
+      // clean up so the test doesn't leave junk in the db
+      await prisma.request.deleteMany({ where: { id: { in: [older.id, newer.id, notMine.id] } } });
+      await prisma.user.delete({ where: { id: someoneElse.id } });
+    }
   });
 });
