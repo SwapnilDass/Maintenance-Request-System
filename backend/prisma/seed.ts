@@ -1,5 +1,6 @@
 
 // one-off script to put a test user in the db, run with "npm run prisma:seed"
+import "dotenv/config"; // loads DATABASE_URL from .env
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -20,6 +21,19 @@ async function main() {
   });
 
   console.log("Seeded customer@demo.com / password123");
+
+  // default categories for the submit request form dropdown
+  // upsert so running the seed twice doesn't make duplicates
+  const categories = ["Electrical", "Plumbing", "HVAC", "IT", "Other"];
+  for (const name of categories) {
+    await prisma.category.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
+  console.log(`Seeded categories: ${categories.join(", ")}`);
 }
 
 main()

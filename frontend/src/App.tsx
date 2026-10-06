@@ -1,5 +1,6 @@
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
+import { SubmitRequestPage } from "./pages/SubmitRequestPage";
 import "./App.css";
 
 function AppContent() {
@@ -21,6 +22,7 @@ function AppContent() {
           Log out
         </button>
       </div>
+      <SubmitRequestPage />
     </div>
   );
 }

@@ -15,12 +15,41 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // bcrypt hash, never the raw password
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String // bcrypt hash, never the raw password
   name      String
-  role      Role     @default(CUSTOMER)
-  createdAt DateTime @default(now())
+  role      Role      @default(CUSTOMER)
+  createdAt DateTime  @default(now())
+  requests  Request[]
 }
 
-// Define remaining models here (Request, Category, ...)
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// the types of problems someone can report (Electrical, Plumbing, ...)
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  requests Request[]
+}
+
+// a maintenance request submitted by a user
+model Request {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  location    String
+  priority    Priority @default(MEDIUM)
+  status      String   @default("Submitted") // technicians will change this in sprint 2
+  createdAt   DateTime @default(now())
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+}

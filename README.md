@@ -20,6 +20,10 @@ CPS 714 team project. Stack: React (Vite + TS) + Express (TS) + PostgreSQL via P
    cd backend
    cp .env.example .env
    npm install
+   npx prisma migrate dev      # creates the tables in the docker postgres
+   npm run prisma:seed         # demo user (customer@demo.com / password123) + categories
+   npm run dev                 # API at http://localhost:4000
+   npm test                    # story #2 tests (db tests skip if postgres isn't running)
    ```
    Scripts available in `backend/package.json`:
    - `npm run dev` — run the API with ts-node-dev (once `src/index.ts` exists)

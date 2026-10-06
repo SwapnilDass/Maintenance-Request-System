@@ -48,7 +48,9 @@
   color: var(--text-muted);
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   font: inherit;
   font-size: 16px;
   color: var(--text);
@@ -58,7 +60,9 @@
   background: var(--surface);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
@@ -86,6 +90,12 @@
 
 .error-text {
   color: var(--error);
+  font-size: 13px;
+  margin: 0;
+}
+
+.success-text {
+  color: #15803d;
   font-size: 13px;
   margin: 0;
 }
