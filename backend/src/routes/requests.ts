@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireRole } from "../middleware/requireRole";
 
 const router = Router();
 
@@ -16,7 +17,8 @@ export const createRequestSchema = z.object({
   }),
 });
 
-router.post("/", requireAuth, async (req, res) => {
+// only customers/employees submit requests (story #1 - users only get the features meant for their role)
+router.post("/", requireAuth, requireRole("CUSTOMER"), async (req, res) => {
   const parsed = createRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     // send back the first problem so the form can show it
@@ -48,7 +50,7 @@ router.post("/", requireAuth, async (req, res) => {
 
 // story #3 - the logged in user's own requests, newest first, so they can check the status.
 // userId comes from the token, so there's no way to ask for someone else's requests
-router.get("/mine", requireAuth, async (_req, res) => {
+router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
   const requests = await prisma.request.findMany({
     where: { userId: res.locals.userId },
     orderBy: { createdAt: "desc" },

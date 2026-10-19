@@ -1,5 +1,5 @@
 // keeps track of who's logged in across the whole app, not just the login page
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiClient } from "../api/client";
 
 export interface User {
@@ -41,6 +41,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("user");
     setUser(null);
   }
+
+  // api/client.ts fires this when the backend says our token is no good anymore
+  useEffect(() => {
+    window.addEventListener("auth:expired", logout);
+    return () => window.removeEventListener("auth:expired", logout);
+  }, []);
+
+  // on page load, check the saved token with the backend so an expired one doesn't
+  // leave us looking logged in (a 401 here triggers auth:expired above)
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      apiClient.get<User>("/auth/me").catch(() => {});
+    }
+  }, []);
 
   return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
 }
