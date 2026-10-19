@@ -51,8 +51,12 @@ Sprint 1 (stories #1–#3) is done:
 - **#2 Submit a maintenance request** — title, description, location, category, priority; validated and saved with status `Submitted`
 - **#3 View my requests** — a user's own requests, newest first, with status
 
-Sprint 2 (stories #4–#7) is in progress. Goal: a manager sees all open requests and assigns one to a technician, who updates it through to "Resolved" and adds notes. The API contract the team builds to is in **[docs/sprint-2-api.md](docs/sprint-2-api.md)**.
+Sprint 2 (stories #4–#7) is done. Goal: a manager sees all open requests and assigns one to a technician, who updates it through to "Resolved" and adds notes. API contract: **[docs/sprint-2-api.md](docs/sprint-2-api.md)**.
 
+- **#4 All open requests** — manager page (`/manager`, admins see it too) with priority + status, most urgent first
+- **#5 Assign to a technician** — dropdown on each request; reassigning moves it to the new technician
+- **#6 My assigned requests** — technician page (`/technician`), unfinished work first
+- **#7 Update status + notes** — request detail page (`/requests/:id`): the assigned technician moves Assigned → In Progress → Resolved; technician/manager add notes; the customer reads them
 - Schema: requests have an assigned technician, plus a Notes table (`20261019170000_add_assignment_and_notes`)
-- Done: `GET /api/requests/open` (#4), `GET /api/requests/assigned` (#6), `GET /api/requests/:id` (detail + notes), `GET /api/users/technicians`
-- To do: assign (#5), update status + add note (#7) APIs, and the manager/technician/detail pages. Their tests are already in `backend/tests/sprint2.test.ts` and show as TODO until built
+
+Admin tools (manage users and categories) are Sprint 3.

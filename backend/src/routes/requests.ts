@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
-import { isOpen, CLOSED_STATUSES } from "../lib/status";
+import { isOpen, canMoveTo, CLOSED_STATUSES, STATUS } from "../lib/status";
 
 const router = Router();
 
@@ -131,6 +131,112 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 
   res.json(request);
+});
+
+// what the #5/#7 endpoints send back after a change - same shape as /open so the pages can swap it in
+const requestDetails = {
+  category: true,
+  user: personFields,
+  assignedTechnician: personFields,
+} as const;
+
+const assignSchema = z.object({
+  technicianId: z.string().min(1, "Choose a technician"),
+});
+
+// story #5 - a manager assigns a request to a technician (or moves it to a different one).
+// either way the status goes to "Assigned", so a reassigned request starts fresh with the new technician
+router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async (req, res) => {
+  const parsed = assignSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const request = await prisma.request.findUnique({ where: { id: String(req.params.id) } });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+  if (!isOpen(request.status)) {
+    return res.status(400).json({ error: "This request is already resolved" });
+  }
+
+  // the dropdown only lists technicians, but check anyway so nobody can assign work to a customer
+  const technician = await prisma.user.findUnique({ where: { id: parsed.data.technicianId } });
+  if (!technician || technician.role !== "TECHNICIAN") {
+    return res.status(400).json({ error: "You can only assign requests to a technician" });
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: request.id },
+    data: { assignedTechnicianId: technician.id, status: STATUS.ASSIGNED },
+    include: requestDetails,
+  });
+
+  res.json(updated);
+});
+
+const statusSchema = z.object({
+  status: z.string().min(1, "Status is required"),
+});
+
+// story #7 - the assigned technician moves a request one step forward:
+// Assigned -> In Progress -> Resolved (canMoveTo in lib/status.ts has the rules)
+router.patch("/:id/status", requireAuth, requireRole("TECHNICIAN"), async (req, res) => {
+  const parsed = statusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const request = await prisma.request.findUnique({ where: { id: String(req.params.id) } });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+  // only the technician it's assigned to, not just any technician
+  if (request.assignedTechnicianId !== res.locals.userId) {
+    return res.status(403).json({ error: "This request isn't assigned to you" });
+  }
+  if (!canMoveTo(request.status, parsed.data.status)) {
+    return res
+      .status(400)
+      .json({ error: `Can't change status from "${request.status}" to "${parsed.data.status}"` });
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: request.id },
+    data: { status: parsed.data.status },
+    include: requestDetails,
+  });
+
+  res.json(updated);
+});
+
+const noteSchema = z.object({
+  body: z.string().trim().min(1, "Note can't be empty").max(1000),
+});
+
+// story #7 - add a progress note ("ordered a new part, back Thursday").
+// the assigned technician and managers/admins can write them, the submitter reads them on the detail page
+router.post("/:id/notes", requireAuth, requireRole("TECHNICIAN", "MANAGER", "ADMIN"), async (req, res) => {
+  const parsed = noteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const request = await prisma.request.findUnique({ where: { id: String(req.params.id) } });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+  if (res.locals.role === "TECHNICIAN" && request.assignedTechnicianId !== res.locals.userId) {
+    return res.status(403).json({ error: "This request isn't assigned to you" });
+  }
+
+  // authorId comes from the token so nobody can post a note as someone else
+  const note = await prisma.note.create({
+    data: { body: parsed.data.body, requestId: request.id, authorId: res.locals.userId },
+    include: { author: { select: { id: true, name: true, role: true } } },
+  });
+
+  res.status(201).json(note);
 });
 
 export default router;
