@@ -4,6 +4,7 @@ import cors from "cors";
 import authRouter from "./routes/auth";
 import categoriesRouter from "./routes/categories";
 import requestsRouter from "./routes/requests";
+import usersRouter from "./routes/users";
 
 export const app = express();
 
@@ -15,3 +16,4 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", authRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/requests", requestsRouter);
+app.use("/api/users", usersRouter);

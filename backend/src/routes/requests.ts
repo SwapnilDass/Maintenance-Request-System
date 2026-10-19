@@ -3,8 +3,12 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { isOpen, CLOSED_STATUSES } from "../lib/status";
 
 const router = Router();
+
+// what we send back about a person on a request - never the password hash
+export const personFields = { select: { id: true, name: true, email: true } } as const;
 
 // exported so the tests can check the validation rules directly
 export const createRequestSchema = z.object({
@@ -58,6 +62,75 @@ router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
   });
 
   res.json(requests);
+});
+
+// ---- sprint 2 ----
+// note: these fixed paths (/open, /assigned) have to stay above "/:id" or express would treat
+// the word "open" as a request id
+
+// story #4 - every request that isn't resolved yet, from every user, for the manager's "All Requests" page.
+// most urgent first, then oldest first within the same priority so nothing gets stuck at the bottom.
+// (priority is a postgres enum LOW < MEDIUM < HIGH < URGENT, so "desc" puts URGENT on top)
+router.get("/open", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, res) => {
+  const requests = await prisma.request.findMany({
+    where: { status: { notIn: CLOSED_STATUSES } },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    include: {
+      category: true,
+      user: personFields, // who submitted it
+      assignedTechnician: personFields, // null until a manager assigns it (story #5)
+    },
+  });
+
+  res.json(requests);
+});
+
+// story #6 - the requests a manager assigned to me, for the technician's "My Assigned Requests" page.
+// technicianId comes from the token, so a technician can't look at someone else's list.
+// unfinished work comes first (most urgent, then oldest), resolved ones go to the bottom as history
+router.get("/assigned", requireAuth, requireRole("TECHNICIAN"), async (_req, res) => {
+  const requests = await prisma.request.findMany({
+    where: { assignedTechnicianId: res.locals.userId },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    include: { category: true, user: personFields },
+  });
+
+  // sort is stable, so this keeps the priority/age order inside each group
+  requests.sort((a, b) => Number(!isOpen(a.status)) - Number(!isOpen(b.status)));
+
+  res.json(requests);
+});
+
+// one request with its notes, for the request detail page (needed by story #7 - "everyone sees progress").
+// who can see it: the person who submitted it, the technician it's assigned to, and managers/admins
+router.get("/:id", requireAuth, async (req, res) => {
+  const request = await prisma.request.findUnique({
+    where: { id: String(req.params.id) },
+    include: {
+      category: true,
+      user: personFields,
+      assignedTechnician: personFields,
+      notes: {
+        orderBy: { createdAt: "asc" }, // read top to bottom like a conversation
+        include: { author: { select: { id: true, name: true, role: true } } },
+      },
+    },
+  });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+
+  const { userId, role } = res.locals;
+  const allowed =
+    request.userId === userId ||
+    request.assignedTechnicianId === userId ||
+    role === "MANAGER" ||
+    role === "ADMIN";
+  if (!allowed) {
+    return res.status(403).json({ error: "You don't have permission to do that" });
+  }
+
+  res.json(request);
 });
 
 export default router;
