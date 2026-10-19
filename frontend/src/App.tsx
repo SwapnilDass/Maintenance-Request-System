@@ -3,8 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { homeFor } from "./auth/roles";
+import { AllRequestsPage } from "./pages/AllRequestsPage";
+import { AssignedRequestsPage } from "./pages/AssignedRequestsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MyRequestsPage } from "./pages/MyRequestsPage";
+import { RequestDetailPage } from "./pages/RequestDetailPage";
 import { RoleHomePage } from "./pages/RoleHomePage";
 import { SubmitRequestPage } from "./pages/SubmitRequestPage";
 import "./App.css";
@@ -63,7 +66,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute roles={["TECHNICIAN"]}>
             <Layout>
-              <RoleHomePage role="TECHNICIAN" />
+              <AssignedRequestsPage />
             </Layout>
           </ProtectedRoute>
         }
@@ -73,7 +76,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute roles={["MANAGER"]}>
             <Layout>
-              <RoleHomePage role="MANAGER" />
+              <AllRequestsPage />
             </Layout>
           </ProtectedRoute>
         }
@@ -84,6 +87,20 @@ function AppRoutes() {
           <ProtectedRoute roles={["ADMIN"]}>
             <Layout>
               <RoleHomePage role="ADMIN" />
+              {/* admins can do everything a manager can (sprint 3 adds their own tools above) */}
+              <AllRequestsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* request detail with notes (story #7) - every role can open it, the backend checks they're allowed to see that request */}
+      <Route
+        path="/requests/:id"
+        element={
+          <ProtectedRoute roles={["CUSTOMER", "TECHNICIAN", "MANAGER", "ADMIN"]}>
+            <Layout>
+              <RequestDetailPage />
             </Layout>
           </ProtectedRoute>
         }

@@ -9,7 +9,7 @@ Everything is under `http://localhost:4000/api` and needs `Authorization: Bearer
 - **400**: bad input
 - **404**: request not found
 
-The tests in `backend/tests/sprint2.test.ts` check every rule below. Tests for endpoints that aren't built yet show up as **TODO** in `npm test` instead of failing, and switch to real pass/fail as soon as the route exists.
+The tests in `backend/tests/sprint2.test.ts` check every rule below. All of them are built, so every test is a real pass/fail (no TODOs left).
 
 ## Statuses
 
@@ -68,7 +68,7 @@ Returns the request plus `notes` (oldest first, each with `author`).
 
 ---
 
-## To build (Almas): the tests are already written against these rules
+## Built (Almas)
 
 ### `PATCH /requests/:id/assign`: story #5
 **Who:** MANAGER, ADMIN · **Body:** `{ "technicianId": "uuid" }`

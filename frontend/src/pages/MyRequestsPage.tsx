@@ -1,37 +1,8 @@
 // list of the logged in user's own requests and their status (story #3)
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
-
-interface MaintenanceRequest {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-  category: { id: number; name: string };
-}
-
-// status is a plain string in the db (technicians change it in sprint 2),
-// so match loosely and fall back to a neutral color for anything unknown
-function statusClass(status: string) {
-  const s = status.toLowerCase();
-  if (s === "submitted") return "status-badge status-submitted";
-  if (s.includes("progress") || s === "assigned") return "status-badge status-progress";
-  if (s === "resolved" || s === "completed" || s === "closed") return "status-badge status-done";
-  return "status-badge";
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatDate, statusClass, type MaintenanceRequest } from "../lib/requests";
 
 // refreshKey: App bumps this after a new request is submitted so the list reloads
 export function MyRequestsPage({ refreshKey = 0 }: { refreshKey?: number }) {
@@ -96,6 +67,10 @@ export function MyRequestsPage({ refreshKey = 0 }: { refreshKey?: number }) {
               </p>
               <p className="request-description">{r.description}</p>
               <p className="request-date">Submitted {formatDate(r.createdAt)}</p>
+              {/* detail page shows the technician's progress notes (story #7) */}
+              <Link className="request-link" to={`/requests/${r.id}`}>
+                View details and notes
+              </Link>
             </li>
           ))}
         </ul>

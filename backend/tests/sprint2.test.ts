@@ -418,6 +418,18 @@ describe("story #5 - PATCH /requests/:id/assign (manager assigns to a technician
     assert.equal(after.status, STATUS.SUBMITTED);
   });
 
+  test("a resolved request can't be reassigned (needs db)", async (t) => {
+    if (!dbReady) return t.skip("database not running");
+    const request = await makeAssigned(STATUS.RESOLVED);
+    const res = await assign(request.id, manager, { technicianId: otherTech.id });
+    if (notReady(t, res, WHAT)) return;
+
+    assert.equal(res.status, 400);
+    const after = await prisma.request.findUniqueOrThrow({ where: { id: request.id } });
+    assert.equal(after.status, STATUS.RESOLVED);
+    assert.equal(after.assignedTechnicianId, tech.id);
+  });
+
   test("missing technicianId returns 400 (needs db)", async (t) => {
     if (!dbReady) return t.skip("database not running");
     const request = await makeRequest({});
