@@ -21,7 +21,11 @@ model User {
   name      String
   role      Role      @default(CUSTOMER)
   createdAt DateTime  @default(now())
-  requests  Request[]
+  requests  Request[] @relation("SubmittedRequests") // requests this user submitted
+
+  // sprint 2
+  assignedRequests Request[] @relation("AssignedRequests") // requests assigned to this technician
+  notes            Note[] // progress notes this user wrote
 }
 
 enum Priority {
@@ -45,11 +49,29 @@ model Request {
   description String
   location    String
   priority    Priority @default(MEDIUM)
-  status      String   @default("Submitted") // technicians will change this in sprint 2
+  status      String   @default("Submitted") // Submitted -> Assigned -> In Progress -> Resolved (see src/lib/status.ts)
   createdAt   DateTime @default(now())
 
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation("SubmittedRequests", fields: [userId], references: [id])
   categoryId Int
   category   Category @relation(fields: [categoryId], references: [id])
+
+  // sprint 2 - the technician a manager assigned this to (empty until assigned, story #5)
+  assignedTechnicianId String?
+  assignedTechnician   User?   @relation("AssignedRequests", fields: [assignedTechnicianId], references: [id])
+
+  notes Note[]
+}
+
+// a progress note on a request, ex. "ordered a new part, back Thursday" (story #7)
+model Note {
+  id        String   @id @default(uuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade) // notes go away with their request
+  authorId  String
+  author    User    @relation(fields: [authorId], references: [id])
 }

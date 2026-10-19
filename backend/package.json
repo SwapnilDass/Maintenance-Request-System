@@ -9,7 +9,12 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "db:up": "docker compose -f ../docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f ../docker-compose.yml down",
+    "db:reset": "prisma migrate reset --force --skip-seed && npm run prisma:seed",
+    "env:init": "node -e \"const fs=require('fs');if(fs.existsSync('.env')){console.log('.env already exists, leaving it alone')}else{fs.copyFileSync('.env.example','.env');console.log('created .env from .env.example')}\"",
+    "setup": "npm run env:init && prisma migrate deploy && prisma generate && npm run prisma:seed"
   },
   "keywords": [],
   "author": "",
