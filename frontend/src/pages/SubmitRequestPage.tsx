@@ -2,6 +2,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import axios from "axios";
 import { apiClient } from "../api/client";
+import { Select } from "../components/Select";
 
 interface Category {
   id: number;
@@ -34,6 +35,11 @@ export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void })
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    // the custom dropdown can't use the browser's "required", so check it here
+    if (!categoryId) {
+      setError("Please choose a category.");
+      return;
+    }
     setSubmitting(true);
     try {
       // apiClient adds our login token to the request automatically
@@ -97,27 +103,29 @@ export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void })
             required
           />
         </label>
-        <label className="field">
-          Category
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-            <option value="">Select a category</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Priority
-          <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* div + htmlFor instead of wrapping in <label>: a click inside the open list would otherwise
+            bubble to the label and reopen it */}
+        <div className="field">
+          <label htmlFor="request-category">Category</label>
+          <Select
+            id="request-category"
+            ariaLabel="Category"
+            value={categoryId}
+            onChange={setCategoryId}
+            placeholder="Select a category"
+            options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="request-priority">Priority</label>
+          <Select
+            id="request-priority"
+            ariaLabel="Priority"
+            value={priority}
+            onChange={setPriority}
+            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+          />
+        </div>
         {error && <p className="error-text">{error}</p>}
         {success && <p className="success-text">{success}</p>}
         <button type="submit" className="btn-primary" disabled={submitting}>

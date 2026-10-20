@@ -49,7 +49,6 @@
 }
 
 .field input,
-.field select,
 .field textarea {
   font: inherit;
   font-size: 16px;
@@ -61,7 +60,6 @@
 }
 
 .field input:focus,
-.field select:focus,
 .field textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
@@ -270,14 +268,13 @@
   margin-top: 12px;
 }
 
-.assign-row select {
-  font: inherit;
+.assign-row .select {
+  width: 220px;
+}
+
+.assign-row .select-button {
   font-size: 14px;
   padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
 }
 
 .assign-row .request-link {
@@ -355,4 +352,93 @@
 
 .note-form .btn-secondary {
   align-self: flex-start;
+}
+
+/* ---- custom dropdown (components/Select.tsx) ---- */
+
+.select {
+  position: relative;
+  width: 100%;
+}
+
+.select-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text);
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.select-button:focus-visible,
+.select-button[aria-expanded="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.select-invalid {
+  border-color: var(--error);
+}
+
+.select-placeholder {
+  color: var(--text-muted);
+}
+
+.select-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.select-button[aria-expanded="true"] .select-chevron {
+  transform: rotate(180deg);
+}
+
+.select-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-option-active {
+  background: var(--bg);
+}
+
+.select-option[aria-selected="true"] {
+  font-weight: 600;
+  color: var(--accent);
 }
