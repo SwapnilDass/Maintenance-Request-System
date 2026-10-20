@@ -23,6 +23,7 @@ export function AllRequestsPage() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
+  // load the open requests and the technicians (for the dropdown) at the same time
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -46,6 +47,7 @@ export function AllRequestsPage() {
     };
   }, [reloadCount]);
 
+  // Assign / Reassign button - calls PATCH /api/requests/:id/assign with the technician picked in the dropdown
   async function assign(request: MaintenanceRequest) {
     const technicianId = picked[request.id] ?? request.assignedTechnicianId ?? "";
     if (!technicianId) {

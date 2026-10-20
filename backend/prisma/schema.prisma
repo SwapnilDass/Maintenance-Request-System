@@ -1,3 +1,12 @@
+// the database design - prisma turns this into the postgres tables (the SQL is in prisma/migrations)
+//
+//   User      everyone who logs in, with a role (customer, technician, manager, admin)
+//   Category  the kinds of problem (Electrical, Plumbing, HVAC, IT, Other)
+//   Request   a maintenance request: who submitted it, its category, priority, status and assigned technician
+//   Note      a progress note on a request (sprint 2)
+//
+// after changing this file: npx prisma migrate dev (makes a new migration + updates the tables)
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +16,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// what each user is allowed to do (checked by middleware/requireRole.ts)
 enum Role {
   CUSTOMER
   TECHNICIAN
@@ -14,6 +24,7 @@ enum Role {
   ADMIN
 }
 
+// everyone who can log in. requests = the ones they submitted
 model User {
   id        String    @id @default(uuid())
   email     String    @unique
@@ -28,6 +39,7 @@ model User {
   notes            Note[] // progress notes this user wrote
 }
 
+// how urgent a request is - postgres keeps them in this order, so sorting puts URGENT first
 enum Priority {
   LOW
   MEDIUM
