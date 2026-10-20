@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { apiClient } from "../api/client";
+import { Select } from "../components/Select";
 import {
   formatDate,
   priorityClass,
@@ -116,18 +117,13 @@ export function AllRequestsPage() {
                 <p className="request-date">Submitted {formatDate(r.createdAt)}</p>
 
                 <div className="assign-row">
-                  <select
-                    aria-label={`Technician for ${r.title}`}
+                  <Select
+                    ariaLabel={`Technician for ${r.title}`}
                     value={value}
-                    onChange={(e) => setPicked((p) => ({ ...p, [r.id]: e.target.value }))}
-                  >
-                    <option value="">Unassigned</option>
-                    {technicians.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setPicked((p) => ({ ...p, [r.id]: v }))}
+                    placeholder="Unassigned"
+                    options={technicians.map((t) => ({ value: t.id, label: t.name }))}
+                  />
                   <button
                     type="button"
                     className="btn-secondary"
