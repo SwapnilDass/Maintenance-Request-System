@@ -1,3 +1,5 @@
+import axios from "axios";
+
 // shapes and helpers shared by every page that shows maintenance requests
 // (the API shapes are documented in docs/sprint-2-api.md)
 
@@ -28,6 +30,20 @@ export interface MaintenanceRequest {
   assignedTechnicianId?: string | null;
   assignedTechnician?: Person | null;
   notes?: Note[]; // only on GET /requests/:id
+}
+
+export const PRIORITIES = ["URGENT", "HIGH", "MEDIUM", "LOW"]; // most urgent first, same order as the open list
+
+// most urgent first, then oldest first - the same order GET /requests/open uses, so the list can
+// re-sort itself after a priority change without reloading
+export function byUrgency(a: MaintenanceRequest, b: MaintenanceRequest) {
+  return PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || a.createdAt.localeCompare(b.createdAt);
+}
+
+// the backend's error message (ex. "You can't change your own role"), or a fallback
+export function errorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err) && err.response?.data?.error) return err.response.data.error as string;
+  return fallback;
 }
 
 // the next status a technician can move a request to - same rules as backend/src/lib/status.ts

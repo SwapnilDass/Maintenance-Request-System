@@ -1,11 +1,15 @@
 // manager/admin "All Requests" page - every open request (story #4) with an assign dropdown (story #5)
+// and a priority dropdown (story #13)
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { apiClient } from "../api/client";
 import { Select } from "../components/Select";
 import {
+  byUrgency,
+  errorMessage,
   formatDate,
+  PRIORITIES,
   priorityClass,
   statusClass,
   type MaintenanceRequest,
@@ -21,8 +25,10 @@ export function AllRequestsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [savingPriorityId, setSavingPriorityId] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
+  // load the open requests and the technicians (for the dropdown) at the same time
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -46,6 +52,7 @@ export function AllRequestsPage() {
     };
   }, [reloadCount]);
 
+  // Assign / Reassign button - calls PATCH /api/requests/:id/assign with the technician picked in the dropdown
   async function assign(request: MaintenanceRequest) {
     const technicianId = picked[request.id] ?? request.assignedTechnicianId ?? "";
     if (!technicianId) {
@@ -70,6 +77,24 @@ export function AllRequestsPage() {
       }
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  // priority dropdown (story #13) - saves as soon as a new priority is picked, then the list re-sorts
+  // so the request moves up or down like it would after a refresh
+  async function changePriority(request: MaintenanceRequest, priority: string) {
+    if (priority === request.priority) return;
+    setError(null);
+    setMessage(null);
+    setSavingPriorityId(request.id);
+    try {
+      const { data } = await apiClient.patch<MaintenanceRequest>(`/requests/${request.id}/priority`, { priority });
+      setRequests((list) => list.map((r) => (r.id === data.id ? data : r)).sort(byUrgency));
+      setMessage(`"${data.title}" is now ${data.priority} priority.`);
+    } catch (err) {
+      setError(errorMessage(err, "Could not change the priority."));
+    } finally {
+      setSavingPriorityId(null);
     }
   }
 
@@ -135,6 +160,16 @@ export function AllRequestsPage() {
                   <Link className="request-link" to={`/requests/${r.id}`}>
                     Details
                   </Link>
+                </div>
+                <div className="assign-row priority-row">
+                  <span className="row-label">Priority</span>
+                  <Select
+                    ariaLabel={`Priority for ${r.title}`}
+                    value={r.priority}
+                    onChange={(v) => changePriority(r, v)}
+                    options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+                  />
+                  {savingPriorityId === r.id && <span className="row-label">Saving...</span>}
                 </div>
               </li>
             );

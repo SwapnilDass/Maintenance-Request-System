@@ -1,3 +1,21 @@
+// all the maintenance request API routes - everything here is under /api/requests (see app.ts)
+//
+//   sprint 1
+//   POST  /api/requests              customer submits a new request (story #2)
+//   GET   /api/requests/mine         customer sees their own requests + status (story #3)
+//
+//   sprint 2
+//   GET   /api/requests/open         manager sees every open request (story #4)
+//   GET   /api/requests/assigned     technician sees the requests assigned to them (story #6)
+//   GET   /api/requests/:id          one request with its notes (detail page)
+//   PATCH /api/requests/:id/assign   manager assigns it to a technician (story #5)
+//   PATCH /api/requests/:id/status   technician moves it Assigned -> In Progress -> Resolved (story #7)
+//   POST  /api/requests/:id/notes    technician/manager adds a progress note (story #7)
+//
+//   sprint 3
+//   PATCH /api/requests/:id/priority manager changes how urgent it is (story #13)
+//
+// every route starts with requireAuth (must be logged in) and most with requireRole (must be the right role)
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -10,6 +28,7 @@ const router = Router();
 // what we send back about a person on a request - never the password hash
 export const personFields = { select: { id: true, name: true, email: true } } as const;
 
+// the rules for a new request - zod checks the body and rejects anything missing or invalid with a 400.
 // exported so the tests can check the validation rules directly
 export const createRequestSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(100),
@@ -21,6 +40,7 @@ export const createRequestSchema = z.object({
   }),
 });
 
+// ===== POST /api/requests - submit a new request (story #2) =====
 // only customers/employees submit requests (story #1 - users only get the features meant for their role)
 router.post("/", requireAuth, requireRole("CUSTOMER"), async (req, res) => {
   const parsed = createRequestSchema.safeParse(req.body);
@@ -52,6 +72,7 @@ router.post("/", requireAuth, requireRole("CUSTOMER"), async (req, res) => {
   res.status(201).json(request);
 });
 
+// ===== GET /api/requests/mine - my requests (story #3) =====
 // story #3 - the logged in user's own requests, newest first, so they can check the status.
 // userId comes from the token, so there's no way to ask for someone else's requests
 router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
@@ -68,6 +89,7 @@ router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
 // note: these fixed paths (/open, /assigned) have to stay above "/:id" or express would treat
 // the word "open" as a request id
 
+// ===== GET /api/requests/open - all open requests for the manager (story #4) =====
 // story #4 - every request that isn't resolved yet, from every user, for the manager's "All Requests" page.
 // most urgent first, then oldest first within the same priority so nothing gets stuck at the bottom.
 // (priority is a postgres enum LOW < MEDIUM < HIGH < URGENT, so "desc" puts URGENT on top)
@@ -85,6 +107,7 @@ router.get("/open", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, r
   res.json(requests);
 });
 
+// ===== GET /api/requests/assigned - my assigned requests for the technician (story #6) =====
 // story #6 - the requests a manager assigned to me, for the technician's "My Assigned Requests" page.
 // technicianId comes from the token, so a technician can't look at someone else's list.
 // unfinished work comes first (most urgent, then oldest), resolved ones go to the bottom as history
@@ -101,6 +124,7 @@ router.get("/assigned", requireAuth, requireRole("TECHNICIAN"), async (_req, res
   res.json(requests);
 });
 
+// ===== GET /api/requests/:id - one request + its notes (detail page) =====
 // one request with its notes, for the request detail page (needed by story #7 - "everyone sees progress").
 // who can see it: the person who submitted it, the technician it's assigned to, and managers/admins
 router.get("/:id", requireAuth, async (req, res) => {
@@ -140,10 +164,12 @@ const requestDetails = {
   assignedTechnician: personFields,
 } as const;
 
+// body must be { technicianId }
 const assignSchema = z.object({
   technicianId: z.string().min(1, "Choose a technician"),
 });
 
+// ===== PATCH /api/requests/:id/assign - assign to a technician (story #5) =====
 // story #5 - a manager assigns a request to a technician (or moves it to a different one).
 // either way the status goes to "Assigned", so a reassigned request starts fresh with the new technician
 router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async (req, res) => {
@@ -165,6 +191,9 @@ router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async 
   if (!technician || technician.role !== "TECHNICIAN") {
     return res.status(400).json({ error: "You can only assign requests to a technician" });
   }
+  if (!technician.active) {
+    return res.status(400).json({ error: "That technician's account is deactivated" });
+  }
 
   const updated = await prisma.request.update({
     where: { id: request.id },
@@ -175,10 +204,12 @@ router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async 
   res.json(updated);
 });
 
+// body must be { status }, ex. { "status": "In Progress" }
 const statusSchema = z.object({
   status: z.string().min(1, "Status is required"),
 });
 
+// ===== PATCH /api/requests/:id/status - update status (story #7) =====
 // story #7 - the assigned technician moves a request one step forward:
 // Assigned -> In Progress -> Resolved (canMoveTo in lib/status.ts has the rules)
 router.patch("/:id/status", requireAuth, requireRole("TECHNICIAN"), async (req, res) => {
@@ -203,17 +234,23 @@ router.patch("/:id/status", requireAuth, requireRole("TECHNICIAN"), async (req, 
 
   const updated = await prisma.request.update({
     where: { id: request.id },
-    data: { status: parsed.data.status },
+    // remember when it was resolved, for the dashboard's average time to resolve (story #11)
+    data: {
+      status: parsed.data.status,
+      ...(parsed.data.status === STATUS.RESOLVED ? { resolvedAt: new Date() } : {}),
+    },
     include: requestDetails,
   });
 
   res.json(updated);
 });
 
+// body must be { body: "note text" }, trimmed, 1-1000 characters
 const noteSchema = z.object({
   body: z.string().trim().min(1, "Note can't be empty").max(1000),
 });
 
+// ===== POST /api/requests/:id/notes - add a note (story #7) =====
 // story #7 - add a progress note ("ordered a new part, back Thursday").
 // the assigned technician and managers/admins can write them, the submitter reads them on the detail page
 router.post("/:id/notes", requireAuth, requireRole("TECHNICIAN", "MANAGER", "ADMIN"), async (req, res) => {
@@ -237,6 +274,38 @@ router.post("/:id/notes", requireAuth, requireRole("TECHNICIAN", "MANAGER", "ADM
   });
 
   res.status(201).json(note);
+});
+
+const prioritySchema = z.object({
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"], {
+    error: "Priority must be LOW, MEDIUM, HIGH or URGENT",
+  }),
+});
+
+// ===== PATCH /api/requests/:id/priority - change priority (story #13) =====
+// a manager can raise or lower how urgent a request is, so urgent issues get handled first.
+// the open list is sorted by priority, so the request moves up or down right away
+router.patch("/:id/priority", requireAuth, requireRole("MANAGER", "ADMIN"), async (req, res) => {
+  const parsed = prioritySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const request = await prisma.request.findUnique({ where: { id: String(req.params.id) } });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+  if (!isOpen(request.status)) {
+    return res.status(400).json({ error: "This request is already resolved" });
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: request.id },
+    data: { priority: parsed.data.priority },
+    include: requestDetails,
+  });
+
+  res.json(updated);
 });
 
 export default router;

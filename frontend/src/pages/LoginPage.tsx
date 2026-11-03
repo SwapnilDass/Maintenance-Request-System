@@ -1,5 +1,6 @@
 // the actual login form the user sees and types into
 import { type FormEvent, useState } from "react";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
@@ -15,8 +16,13 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      // a deactivated account gets its own message (story #9), anything else is the usual one
+      setError(
+        axios.isAxiosError(err) && err.response?.status === 403
+          ? err.response.data.error
+          : "Invalid email or password."
+      );
     } finally {
       setSubmitting(false);
     }

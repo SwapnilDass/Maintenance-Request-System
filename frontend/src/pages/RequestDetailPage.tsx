@@ -30,6 +30,7 @@ export function RequestDetailPage() {
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // load the request + its notes (GET /api/requests/:id). the backend answers 403 if you're not allowed to see it
   useEffect(() => {
     let cancelled = false;
     apiClient
@@ -71,10 +72,13 @@ export function RequestDetailPage() {
     );
   }
 
+  // what this user can do on this page: only the assigned technician gets the status button,
+  // the assigned technician and managers/admins get the note box, everyone else just reads
   const isAssignedTech = user?.role === "TECHNICIAN" && request.assignedTechnicianId === user.id;
   const canAddNote = isAssignedTech || user?.role === "MANAGER" || user?.role === "ADMIN";
   const nextStatus = isAssignedTech ? NEXT_STATUS[request.status] : undefined;
 
+  // "Mark as In Progress" / "Mark as Resolved" button - PATCH /api/requests/:id/status
   async function moveStatus(status: string) {
     setError(null);
     setSaving(true);
@@ -89,6 +93,7 @@ export function RequestDetailPage() {
     }
   }
 
+  // "Add note" form - POST /api/requests/:id/notes, then show the new note at the bottom
   async function addNote(e: FormEvent) {
     e.preventDefault();
     setError(null);
