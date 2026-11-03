@@ -59,4 +59,13 @@ Sprint 2 (stories #4–#7) is done. Goal: a manager sees all open requests and a
 - **#7 Update status + notes** — request detail page (`/requests/:id`): the assigned technician moves Assigned → In Progress → Resolved; technician/manager add notes; the customer reads them
 - Schema: requests have an assigned technician, plus a Notes table (`20261019170000_add_assignment_and_notes`)
 
-Admin tools (manage users and categories) are Sprint 3.
+Sprint 3 (stories #9, #10, #11, #13) is done. Goal: an admin can manage users and categories, and a manager can see request counts, technician workload and completion rate on a dashboard.
+
+- **#9 Manage users** — admin "Users" tab (`/admin`): add users, change roles, deactivate/reactivate. Deactivated users can't log in and drop out of the assign dropdown; an admin can't change their own role or deactivate themselves
+- **#10 Manage categories** — admin "Categories" tab (`/admin/categories`): add, rename, delete. Categories that requests use can only be renamed
+- **#11 Dashboard** — "Dashboard" tab for managers (`/manager/dashboard`) and admins: totals, completion rate, average time to resolve, requests by status, open requests by priority, technician workload (`GET /api/metrics`)
+- **#13 Change priority** — priority dropdown on each request in the manager's list; the list re-sorts right away
+- Tests: `backend/tests/sprint3.test.ts` covers all four stories, an end-to-end test (submit → assign → resolve) and role access for every new endpoint (134 backend tests in total)
+- Schema: `active` on users, `resolvedAt` on requests (`20261103161747_sprint3_user_active_and_resolved_at`). After pulling, run `npm run setup` in `backend`
+
+Still in the backlog for Sprint 4: notifications (#8), search and filter (#12), photo attachments (#14).

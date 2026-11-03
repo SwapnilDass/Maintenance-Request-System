@@ -1,19 +1,34 @@
 import { useState, type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { homeFor } from "./auth/roles";
+import { AdminCategoriesPage } from "./pages/AdminCategoriesPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AllRequestsPage } from "./pages/AllRequestsPage";
 import { AssignedRequestsPage } from "./pages/AssignedRequestsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MyRequestsPage } from "./pages/MyRequestsPage";
 import { RequestDetailPage } from "./pages/RequestDetailPage";
-import { RoleHomePage } from "./pages/RoleHomePage";
 import { SubmitRequestPage } from "./pages/SubmitRequestPage";
 import "./App.css";
 
-// header card with the welcome message + log out, shown on every logged in page
-function Layout({ children }: { children: ReactNode }) {
+// the tabs managers and admins use to move between their pages (sprint 3)
+const MANAGER_TABS = [
+  { to: "/manager", label: "Requests" },
+  { to: "/manager/dashboard", label: "Dashboard" },
+];
+const ADMIN_TABS = [
+  { to: "/admin", label: "Users" },
+  { to: "/admin/categories", label: "Categories" },
+  { to: "/admin/dashboard", label: "Dashboard" },
+  { to: "/admin/requests", label: "Requests" },
+];
+
+// header card with the welcome message + log out, shown on every logged in page.
+// tabs (optional) shows a row of links under it
+function Layout({ children, tabs }: { children: ReactNode; tabs?: { to: string; label: string }[] }) {
   const { user, logout } = useAuth();
 
   return (
@@ -27,6 +42,16 @@ function Layout({ children }: { children: ReactNode }) {
           Log out
         </button>
       </div>
+      {tabs && (
+        <nav className="tabs" aria-label="Sections">
+          {tabs.map((t) => (
+            // end = only highlight /manager on /manager itself, not on /manager/dashboard
+            <NavLink key={t.to} to={t.to} end className={({ isActive }) => (isActive ? "tab tab-active" : "tab")}>
+              {t.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
       {children}
     </div>
   );
@@ -75,19 +100,59 @@ function AppRoutes() {
         path="/manager"
         element={
           <ProtectedRoute roles={["MANAGER"]}>
-            <Layout>
+            <Layout tabs={MANAGER_TABS}>
               <AllRequestsPage />
             </Layout>
           </ProtectedRoute>
         }
       />
+      {/* manager dashboard (story #11) */}
+      <Route
+        path="/manager/dashboard"
+        element={
+          <ProtectedRoute roles={["MANAGER"]}>
+            <Layout tabs={MANAGER_TABS}>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      {/* admin pages (sprint 3): users (#9), categories (#10), plus the manager's dashboard and request list */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute roles={["ADMIN"]}>
-            <Layout>
-              <RoleHomePage role="ADMIN" />
-              {/* admins can do everything a manager can (sprint 3 adds their own tools above) */}
+            <Layout tabs={ADMIN_TABS}>
+              <AdminUsersPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/categories"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Layout tabs={ADMIN_TABS}>
+              <AdminCategoriesPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Layout tabs={ADMIN_TABS}>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/requests"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Layout tabs={ADMIN_TABS}>
               <AllRequestsPage />
             </Layout>
           </ProtectedRoute>

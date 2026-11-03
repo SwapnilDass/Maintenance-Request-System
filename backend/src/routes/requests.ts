@@ -12,6 +12,9 @@
 //   PATCH /api/requests/:id/status   technician moves it Assigned -> In Progress -> Resolved (story #7)
 //   POST  /api/requests/:id/notes    technician/manager adds a progress note (story #7)
 //
+//   sprint 3
+//   PATCH /api/requests/:id/priority manager changes how urgent it is (story #13)
+//
 // every route starts with requireAuth (must be logged in) and most with requireRole (must be the right role)
 import { Router } from "express";
 import { z } from "zod";
@@ -188,6 +191,9 @@ router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async 
   if (!technician || technician.role !== "TECHNICIAN") {
     return res.status(400).json({ error: "You can only assign requests to a technician" });
   }
+  if (!technician.active) {
+    return res.status(400).json({ error: "That technician's account is deactivated" });
+  }
 
   const updated = await prisma.request.update({
     where: { id: request.id },
@@ -228,7 +234,11 @@ router.patch("/:id/status", requireAuth, requireRole("TECHNICIAN"), async (req, 
 
   const updated = await prisma.request.update({
     where: { id: request.id },
-    data: { status: parsed.data.status },
+    // remember when it was resolved, for the dashboard's average time to resolve (story #11)
+    data: {
+      status: parsed.data.status,
+      ...(parsed.data.status === STATUS.RESOLVED ? { resolvedAt: new Date() } : {}),
+    },
     include: requestDetails,
   });
 
@@ -264,6 +274,38 @@ router.post("/:id/notes", requireAuth, requireRole("TECHNICIAN", "MANAGER", "ADM
   });
 
   res.status(201).json(note);
+});
+
+const prioritySchema = z.object({
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"], {
+    error: "Priority must be LOW, MEDIUM, HIGH or URGENT",
+  }),
+});
+
+// ===== PATCH /api/requests/:id/priority - change priority (story #13) =====
+// a manager can raise or lower how urgent a request is, so urgent issues get handled first.
+// the open list is sorted by priority, so the request moves up or down right away
+router.patch("/:id/priority", requireAuth, requireRole("MANAGER", "ADMIN"), async (req, res) => {
+  const parsed = prioritySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const request = await prisma.request.findUnique({ where: { id: String(req.params.id) } });
+  if (!request) {
+    return res.status(404).json({ error: "Request not found" });
+  }
+  if (!isOpen(request.status)) {
+    return res.status(400).json({ error: "This request is already resolved" });
+  }
+
+  const updated = await prisma.request.update({
+    where: { id: request.id },
+    data: { priority: parsed.data.priority },
+    include: requestDetails,
+  });
+
+  res.json(updated);
 });
 
 export default router;
