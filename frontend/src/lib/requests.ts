@@ -30,6 +30,10 @@ export interface MaintenanceRequest {
   assignedTechnicianId?: string | null;
   assignedTechnician?: Person | null;
   notes?: Note[]; // only on GET /requests/:id
+  // sprint 4 - automatic priority (story #16). priorityScore is null for requests from before sprint 4
+  priorityScore?: number | null;
+  priorityOverridden?: boolean; // a manager changed it by hand
+  scoreReasons?: string[]; // what the score is made of, ex. ["Electrical +30", "\"sparks\" (safety) +40"]
 }
 
 export const PRIORITIES = ["URGENT", "HIGH", "MEDIUM", "LOW"]; // most urgent first, same order as the open list
@@ -73,4 +77,12 @@ export function formatDate(iso: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+// "Score 70 · Electrical +30, "sparks" (safety) +40" for the manager, or why there's no score
+export function scoreSummary(r: MaintenanceRequest) {
+  if (r.priorityScore === null || r.priorityScore === undefined) return "Priority set before automatic scoring";
+  const base = `Score ${r.priorityScore}`;
+  if (r.priorityOverridden) return `${base} · priority set by a manager`;
+  return r.scoreReasons?.length ? `${base} · ${r.scoreReasons.join(", ")}` : base;
 }

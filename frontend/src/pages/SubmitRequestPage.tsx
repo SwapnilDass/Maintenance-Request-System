@@ -1,4 +1,5 @@
-// form for an employee/customer to report a maintenance problem (story #2)
+// form for an employee/customer to report a maintenance problem (story #2).
+// sprint 4: no priority field - the system scores the request and picks the priority (stories #15, #16)
 import { type FormEvent, useEffect, useState } from "react";
 import axios from "axios";
 import { apiClient } from "../api/client";
@@ -9,8 +10,6 @@ interface Category {
   name: string;
 }
 
-const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-
 // onSubmitted lets App tell the "My requests" list to reload (story #3)
 export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void }) {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -18,7 +17,6 @@ export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void })
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [priority, setPriority] = useState("MEDIUM");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -43,20 +41,18 @@ export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void })
     setSubmitting(true);
     try {
       // apiClient adds our login token to the request automatically
-      await apiClient.post("/requests", {
+      const { data } = await apiClient.post<{ priority: string }>("/requests", {
         title,
         description,
         location,
         categoryId: Number(categoryId),
-        priority,
       });
-      setSuccess("Request submitted! Status: Submitted");
+      setSuccess(`Request submitted! Status: Submitted · Priority: ${data.priority} (set automatically)`);
       // clear the form so they can submit another one
       setTitle("");
       setDescription("");
       setLocation("");
       setCategoryId("");
-      setPriority("MEDIUM");
       onSubmitted?.();
     } catch (err) {
       // show the backend's message if it sent one (ex. "Title is required")
@@ -116,16 +112,10 @@ export function SubmitRequestPage({ onSubmitted }: { onSubmitted?: () => void })
             options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
           />
         </div>
-        <div className="field">
-          <label htmlFor="request-priority">Priority</label>
-          <Select
-            id="request-priority"
-            ariaLabel="Priority"
-            value={priority}
-            onChange={setPriority}
-            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-          />
-        </div>
+        <p className="form-hint">
+          Priority is set automatically from the category and the problem you describe, so urgent issues
+          (like sparks, gas or flooding) get handled first.
+        </p>
         {error && <p className="error-text">{error}</p>}
         {success && <p className="success-text">{success}</p>}
         <button type="submit" className="btn-primary" disabled={submitting}>

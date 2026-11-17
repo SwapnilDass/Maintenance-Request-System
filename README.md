@@ -68,4 +68,12 @@ Sprint 3 (stories #9, #10, #11, #13) is done. Goal: an admin can manage users an
 - Tests: `backend/tests/sprint3.test.ts` covers all four stories, an end-to-end test (submit → assign → resolve) and role access for every new endpoint (134 backend tests in total)
 - Schema: `active` on users, `resolvedAt` on requests (`20261103161747_sprint3_user_active_and_resolved_at`). After pulling, run `npm run setup` in `backend`
 
-Still in the backlog for Sprint 4: notifications (#8), search and filter (#12), photo attachments (#14).
+Sprint 4 (stories #15, #16, #8) is done. Goal, from the Sprint 3 stakeholder feedback: priority is set by the system, not the customer, and customers get notified when their request changes.
+
+- **#15 Customers don't pick priority** — the Priority field is gone from the submit form; the API ignores a priority sent by a customer
+- **#16 Automatic priority scoring** — every new request gets a score (0–100) from its category, danger words in the title/description and how long it has been waiting; the score picks the priority (60+ URGENT, 40+ HIGH, 20+ MEDIUM, else LOW). The rules are in `backend/src/lib/priorityScore.ts`. Managers see the breakdown (e.g. "Score 70 · Electrical +30, "sparking" (safety) +40") and can still override it (#13), which stops the automatic re-scoring
+- **#8 Notifications** — a bell in the header for every role: customers hear when their request is assigned, changes status or gets a note; technicians hear when work is assigned to them. Unread count, click to open the request, mark all as read (`/api/notifications`)
+- Tests: `backend/tests/sprint4.test.ts` (152 backend tests in total)
+- Schema: `priorityScore` and `priorityOverridden` on requests, a `Notification` table (`20261117161220_sprint4_priority_scoring_and_notifications`). After pulling, run `npm run setup` in `backend`
+
+Left in the backlog: search and filter (#12), photo attachments (#14).

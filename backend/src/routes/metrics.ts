@@ -7,12 +7,14 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { STATUS, CLOSED_STATUSES } from "../lib/status";
+import { refreshAutoPriorities } from "../lib/rescore";
 
 const router = Router();
 
 const PRIORITIES = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
 
 router.get("/", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, res) => {
+  await refreshAutoPriorities(); // so "open by priority" matches the request list (story #16)
   // a few small counting queries instead of loading every request
   const [byStatusRows, openByPriorityRows, resolved, technicians, workloadRows] = await Promise.all([
     prisma.request.groupBy({ by: ["status"], _count: { _all: true } }),

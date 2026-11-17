@@ -15,6 +15,10 @@
 //   sprint 3
 //   PATCH /api/requests/:id/priority manager changes how urgent it is (story #13)
 //
+//   sprint 4
+//   new requests get their priority from an automatic score, not from the customer (stories #15, #16)
+//   assigning, status changes and notes send notifications (story #8, see routes/notifications.ts)
+//
 // every route starts with requireAuth (must be logged in) and most with requireRole (must be the right role)
 import { Router } from "express";
 import { z } from "zod";
@@ -22,6 +26,9 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { isOpen, canMoveTo, CLOSED_STATUSES, STATUS } from "../lib/status";
+import { scoreRequest } from "../lib/priorityScore";
+import { refreshAutoPriorities, withScoreReasons } from "../lib/rescore";
+import { notify } from "../lib/notify";
 
 const router = Router();
 
@@ -35,9 +42,7 @@ export const createRequestSchema = z.object({
   description: z.string().trim().min(1, "Description is required").max(1000),
   location: z.string().trim().min(1, "Location is required").max(100),
   categoryId: z.number().int().positive("Category is required"),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"], {
-    error: "Priority must be LOW, MEDIUM, HIGH or URGENT",
-  }),
+  // no priority: customers don't choose it anymore (story #15). if one is sent anyway, zod drops it
 });
 
 // ===== POST /api/requests - submit a new request (story #2) =====
@@ -48,12 +53,15 @@ router.post("/", requireAuth, requireRole("CUSTOMER"), async (req, res) => {
     // send back the first problem so the form can show it
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
-  const { title, description, location, categoryId, priority } = parsed.data;
+  const { title, description, location, categoryId } = parsed.data;
 
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) {
     return res.status(400).json({ error: "Category does not exist" });
   }
+
+  // the system picks the priority from the category and the words used (story #16, see lib/priorityScore.ts)
+  const { score, priority, reasons } = scoreRequest({ categoryName: category.name, title, description });
 
   // userId comes from the token, not the body, so nobody can submit as someone else.
   // status isn't set here, the db default makes it "Submitted"
@@ -63,19 +71,21 @@ router.post("/", requireAuth, requireRole("CUSTOMER"), async (req, res) => {
       description,
       location,
       priority,
+      priorityScore: score,
       categoryId,
       userId: res.locals.userId,
     },
     include: { category: true },
   });
 
-  res.status(201).json(request);
+  res.status(201).json({ ...request, scoreReasons: reasons });
 });
 
 // ===== GET /api/requests/mine - my requests (story #3) =====
 // story #3 - the logged in user's own requests, newest first, so they can check the status.
 // userId comes from the token, so there's no way to ask for someone else's requests
 router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
+  await refreshAutoPriorities(); // waiting requests may have moved up a priority (story #16)
   const requests = await prisma.request.findMany({
     where: { userId: res.locals.userId },
     orderBy: { createdAt: "desc" },
@@ -94,6 +104,7 @@ router.get("/mine", requireAuth, requireRole("CUSTOMER"), async (_req, res) => {
 // most urgent first, then oldest first within the same priority so nothing gets stuck at the bottom.
 // (priority is a postgres enum LOW < MEDIUM < HIGH < URGENT, so "desc" puts URGENT on top)
 router.get("/open", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, res) => {
+  await refreshAutoPriorities(); // waiting requests may have moved up a priority (story #16)
   const requests = await prisma.request.findMany({
     where: { status: { notIn: CLOSED_STATUSES } },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
@@ -104,7 +115,8 @@ router.get("/open", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, r
     },
   });
 
-  res.json(requests);
+  // scoreReasons lets the manager see why the system picked each priority (story #16)
+  res.json(requests.map(withScoreReasons));
 });
 
 // ===== GET /api/requests/assigned - my assigned requests for the technician (story #6) =====
@@ -112,6 +124,7 @@ router.get("/open", requireAuth, requireRole("MANAGER", "ADMIN"), async (_req, r
 // technicianId comes from the token, so a technician can't look at someone else's list.
 // unfinished work comes first (most urgent, then oldest), resolved ones go to the bottom as history
 router.get("/assigned", requireAuth, requireRole("TECHNICIAN"), async (_req, res) => {
+  await refreshAutoPriorities();
   const requests = await prisma.request.findMany({
     where: { assignedTechnicianId: res.locals.userId },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
@@ -128,6 +141,7 @@ router.get("/assigned", requireAuth, requireRole("TECHNICIAN"), async (_req, res
 // one request with its notes, for the request detail page (needed by story #7 - "everyone sees progress").
 // who can see it: the person who submitted it, the technician it's assigned to, and managers/admins
 router.get("/:id", requireAuth, async (req, res) => {
+  await refreshAutoPriorities();
   const request = await prisma.request.findUnique({
     where: { id: String(req.params.id) },
     include: {
@@ -154,7 +168,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "You don't have permission to do that" });
   }
 
-  res.json(request);
+  res.json(withScoreReasons(request));
 });
 
 // what the #5/#7 endpoints send back after a change - same shape as /open so the pages can swap it in
@@ -201,6 +215,11 @@ router.patch("/:id/assign", requireAuth, requireRole("MANAGER", "ADMIN"), async 
     include: requestDetails,
   });
 
+  // story #8 - tell the customer who's on it, and tell the technician they have new work
+  const actor = res.locals.userId;
+  await notify(request.id, [request.userId], `Your request "${request.title}" was assigned to ${technician.name}.`, actor);
+  await notify(request.id, [technician.id], `New request assigned to you: "${request.title}" (${updated.priority}).`, actor);
+
   res.json(updated);
 });
 
@@ -242,6 +261,9 @@ router.patch("/:id/status", requireAuth, requireRole("TECHNICIAN"), async (req, 
     include: requestDetails,
   });
 
+  // story #8 - the customer hears about every status change
+  await notify(request.id, [request.userId], `Your request "${request.title}" is now ${updated.status}.`, res.locals.userId);
+
   res.json(updated);
 });
 
@@ -273,6 +295,14 @@ router.post("/:id/notes", requireAuth, requireRole("TECHNICIAN", "MANAGER", "ADM
     include: { author: { select: { id: true, name: true, role: true } } },
   });
 
+  // story #8 - the customer and the assigned technician hear about new notes (not whoever wrote it)
+  await notify(
+    request.id,
+    [request.userId, request.assignedTechnicianId],
+    `${note.author.name} added a note to "${request.title}".`,
+    res.locals.userId
+  );
+
   res.status(201).json(note);
 });
 
@@ -284,7 +314,8 @@ const prioritySchema = z.object({
 
 // ===== PATCH /api/requests/:id/priority - change priority (story #13) =====
 // a manager can raise or lower how urgent a request is, so urgent issues get handled first.
-// the open list is sorted by priority, so the request moves up or down right away
+// the open list is sorted by priority, so the request moves up or down right away.
+// sprint 4: this also marks it "overridden", so the automatic score stops changing it (story #16)
 router.patch("/:id/priority", requireAuth, requireRole("MANAGER", "ADMIN"), async (req, res) => {
   const parsed = prioritySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -301,7 +332,7 @@ router.patch("/:id/priority", requireAuth, requireRole("MANAGER", "ADMIN"), asyn
 
   const updated = await prisma.request.update({
     where: { id: request.id },
-    data: { priority: parsed.data.priority },
+    data: { priority: parsed.data.priority, priorityOverridden: true },
     include: requestDetails,
   });
 

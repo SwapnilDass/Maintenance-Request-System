@@ -16,6 +16,7 @@ process.env.JWT_SECRET ??= "test-secret";
 import { app } from "../src/app";
 import { prisma } from "../src/lib/prisma";
 import { createRequestSchema } from "../src/routes/requests";
+import { scoreRequest } from "../src/lib/priorityScore";
 
 const validRequest = {
   title: "Leaking sink",
@@ -45,14 +46,12 @@ describe("createRequestSchema (validation rules)", () => {
     assert.equal(result.success, false);
   });
 
-  test("rejects a priority that isn't LOW/MEDIUM/HIGH/URGENT", () => {
-    const result = createRequestSchema.safeParse({ ...validRequest, priority: "SUPER_URGENT" });
-    assert.equal(result.success, false);
-  });
-
-  test("accepts all four priorities", () => {
-    for (const priority of ["LOW", "MEDIUM", "HIGH", "URGENT"]) {
-      assert.equal(createRequestSchema.safeParse({ ...validRequest, priority }).success, true);
+  // sprint 4 (story #15): customers don't pick priority anymore - whatever they send is dropped
+  test("ignores a priority the customer sends", () => {
+    for (const priority of ["URGENT", "SUPER_URGENT"]) {
+      const result = createRequestSchema.safeParse({ ...validRequest, priority });
+      assert.equal(result.success, true);
+      assert.equal("priority" in result.data!, false, "priority is removed from what gets saved");
     }
   });
 
@@ -166,7 +165,10 @@ describe("API routes", () => {
 
     const created = await res.json();
     assert.equal(created.title, validRequest.title);
-    assert.equal(created.priority, "HIGH");
+    // sprint 4: the priority comes from the automatic score (story #16), not from the "HIGH" sent above
+    const expected = scoreRequest({ categoryName: category.name, title: validRequest.title, description: validRequest.description });
+    assert.equal(created.priority, expected.priority);
+    assert.equal(created.priorityScore, expected.score);
     assert.equal(created.status, "Submitted");
     assert.equal(created.userId, user.id);
     assert.equal(created.category.id, category.id);
