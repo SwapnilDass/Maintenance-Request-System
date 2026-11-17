@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { NotificationBell } from "./components/NotificationBell";
 import { homeFor } from "./auth/roles";
 import { AdminCategoriesPage } from "./pages/AdminCategoriesPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
@@ -34,7 +35,11 @@ function Layout({ children, tabs }: { children: ReactNode; tabs?: { to: string; 
   return (
     <div className="page-center">
       <div className="card">
-        <h1>Maintenance Requests</h1>
+        <div className="header-top">
+          <h1>Maintenance Requests</h1>
+          {/* every role gets notifications about their requests (story #8) */}
+          <NotificationBell />
+        </div>
         <p className="welcome-text">
           Welcome, {user?.name} ({user?.role})
         </p>

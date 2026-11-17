@@ -10,6 +10,7 @@ import {
   errorMessage,
   formatDate,
   PRIORITIES,
+  scoreSummary,
   priorityClass,
   statusClass,
   type MaintenanceRequest,
@@ -140,6 +141,8 @@ export function AllRequestsPage() {
                   {r.category.name} · {r.location} · from {r.user?.name}
                 </p>
                 <p className="request-date">Submitted {formatDate(r.createdAt)}</p>
+                {/* why the system picked this priority (story #16) */}
+                <p className="score-line">{scoreSummary(r)}</p>
 
                 <div className="assign-row">
                   <Select

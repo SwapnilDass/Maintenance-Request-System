@@ -6,6 +6,7 @@ import categoriesRouter from "./routes/categories";
 import requestsRouter from "./routes/requests";
 import usersRouter from "./routes/users";
 import metricsRouter from "./routes/metrics";
+import notificationsRouter from "./routes/notifications";
 
 export const app = express();
 
@@ -19,3 +20,4 @@ app.use("/api/categories", categoriesRouter);
 app.use("/api/requests", requestsRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/metrics", metricsRouter); // sprint 3 - manager dashboard (story #11)
+app.use("/api/notifications", notificationsRouter); // sprint 4 - the bell (story #8)

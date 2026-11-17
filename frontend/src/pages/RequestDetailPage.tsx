@@ -11,6 +11,7 @@ import {
   formatDate,
   NEXT_STATUS,
   priorityClass,
+  scoreSummary,
   statusClass,
   type MaintenanceRequest,
   type Note,
@@ -129,6 +130,12 @@ export function RequestDetailPage() {
         <dd>{request.user?.name}</dd>
         <dt>Submitted</dt>
         <dd>{formatDate(request.createdAt)}</dd>
+        <dt>Priority</dt>
+        <dd>
+          {request.priority}
+          {/* the score breakdown is for staff - customers just see the priority (story #16) */}
+          {user?.role !== "CUSTOMER" && <span className="score-line"> · {scoreSummary(request)}</span>}
+        </dd>
         <dt>Technician</dt>
         <dd>{request.assignedTechnician?.name ?? "Not assigned yet"}</dd>
       </dl>
